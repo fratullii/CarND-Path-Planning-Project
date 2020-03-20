@@ -128,7 +128,7 @@ inline vector<double> getFrenet(double x, double y, double theta,
 
 // Transform from Frenet s,d coordinates to Cartesian x,y
 inline vector<double> getXY(double s, double d, const vector<double> &maps_s, 
-                     const vector<double> &maps_x, 
+                     const vector<double> &maps_x,
                      const vector<double> &maps_y) {
   int prev_wp = -1;
 
@@ -152,6 +152,15 @@ inline vector<double> getXY(double s, double d, const vector<double> &maps_s,
   double y = seg_y + d*sin(perp_heading);
 
   return {x,y};
+}
+
+inline double polyeval(vector<double> coeffs, double t){
+  double val;
+  val = coeffs[0] + coeffs[1] * t;
+  for (int i = 2; i < coeffs.size(); ++i){
+    val += coeffs[i] * pow(t, i);
+  }
+  return val;
 }
 
 #endif  // HELPERS_H
