@@ -16,8 +16,17 @@ struct Map {
     std::vector<double> dx;
     std::vector<double> dy;
 
-    // Constructor
-    Map(string map_file_);
+    /**
+     * @brief Default constructor
+     */
+    Map(){};
+
+    /**
+     * @brief Construct a new Map object
+     * 
+     * @param map_file_ string where to read a map file from
+     */
+    Map(std::string map_file_);
 
 };
 
@@ -50,7 +59,7 @@ struct Car {
 
     /**
      * @brief Set all the new variables from telemetry
-     * 
+     *
      * @param json_data json object containing telemetry variables
      */
     void readTelemetry(nlohmann::json &json_data);
@@ -63,7 +72,7 @@ class PathPlanner{
 
     virtual ~PathPlanner() {};
 
-    std::vector<std::vector<double>> generate_trajectory();
+    std::vector<std::vector<double>> generate_trajectory(Car &car);
 
     private:
 

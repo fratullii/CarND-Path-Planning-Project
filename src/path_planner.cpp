@@ -76,31 +76,31 @@ PathPlanner::PathPlanner(Map& map_in){
     map = map_in;
 }
 
-vector<vector<double>> PathPlanner::generate_trajectory(){
+vector<vector<double>> PathPlanner::generate_trajectory(Car &car){
 
     vector<double> next_x_vals;
     vector<double> next_y_vals;
 
-    // lane where to start
-    int lane = 1;
-
-    // reference velocity
-    double vel_ref = 49.5;
-
-    // Widely spaced points
-    vector<double> ptsx;
-    vector<double> ptsy;
-
+    // // lane where to start
     // int lane = 1;
-    // double dist_inc = 0.4;
-    // int traj_size = 50;
-    // for(int i = 0; i < traj_size; ++i){
-    //     double next_s = car_s + (i+1)*dist_inc;
-    //     double next_d = 2 + lane*4; // fixed lane
-    //     vector<double> xy = getXY(next_s, next_d, map_s, map_x, map_y);
-    //     next_x_vals.push_back(xy[0]);
-    //     next_y_vals.push_back(xy[1]);
-    // }
+
+    // // reference velocity
+    // double vel_ref = 49.5;
+
+    // // Widely spaced points
+    // vector<double> ptsx;
+    // vector<double> ptsy;
+
+    int lane = 1;
+    double dist_inc = 0.4;
+    int traj_size = 50;
+    for(int i = 0; i < traj_size; ++i){
+        double next_s = car.s + (i+1)*dist_inc;
+        double next_d = 2 + lane*4; // fixed lane
+        vector<double> xy = getXY(next_s, next_d, map.s, map.x, map.y);
+        next_x_vals.push_back(xy[0]);
+        next_y_vals.push_back(xy[1]);
+    }
 
     vector<vector<double>> next_vals {next_x_vals, next_y_vals};
 

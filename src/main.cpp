@@ -37,9 +37,9 @@ int main() {
 
       if (s != "") {
         auto j = json::parse(s);
-        
+
         string event = j[0].get<string>();
-        
+
         if (event == "telemetry") {
 
           // j[1] is the data JSON object
@@ -55,7 +55,7 @@ int main() {
            *   sequentially every .02 seconds
            */
           vector<vector<double>> next_vals;
-          next_vals = path_planner.generate_trajectory();
+          next_vals = path_planner.generate_trajectory(car);
 
           next_x_vals = next_vals[0];
           next_y_vals = next_vals[1];
@@ -92,6 +92,6 @@ int main() {
     std::cerr << "Failed to listen to port" << std::endl;
     return -1;
   }
-  
+
   h.run();
 }
