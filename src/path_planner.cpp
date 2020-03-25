@@ -192,8 +192,6 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car){
         next_y_vals.push_back(y_point);
     }
 
-    cout << endl;
-
     vector<vector<double>> next_vals {next_x_vals, next_y_vals};
 
     return next_vals;
