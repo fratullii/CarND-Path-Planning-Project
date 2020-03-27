@@ -76,26 +76,58 @@ PathPlanner::PathPlanner(Map& map_in){
     map = map_in;
 }
 
-vector<vector<double>> PathPlanner::generate_trajectory(Car &car){
+vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
+{
+
+    // cout << "Lane outside: " << ref.lane << endl;
+
+    // Check for another car in the lane
+    double closest_distance = 30;
+    double target_speed = 49.5;
+    bool too_close = false;
+    for(int i = 0; i < car.sensor_fusion.size(); ++i)
+    {
+        float d = car.sensor_fusion[i][6];
+
+        if (d > (ref.lane*4) && d < (ref.lane*4+4))
+        {
+            // cout << "Lane inside " << ref.lane << endl;
+            double vx = car.sensor_fusion[i][3];
+            double vy = car.sensor_fusion[i][4];
+            double check_speed = sqrt(vx*vx + vy*vy);
+            double check_car_s = car.sensor_fusion[i][5];
+            double check_distance = check_car_s-car.s;
+
+            check_car_s += ((double)car.previous_path_size*0.02*check_speed);
+
+            if((check_car_s > car.s) && (check_distance < closest_distance))
+            {
+                target_speed = check_speed;
+                closest_distance = check_distance;
+                too_close = true;
+            }
+
+        }
+    }
+
+
+    if(too_close)
+    {
+        ref.lane = 2;
+    }
 
     // Vectors of x, y trajectory coordinates
     vector<double> next_x_vals;
     vector<double> next_y_vals;
-
-    // lane where to start
-    int lane = 1;
-
-    // reference velocity
-    double ref_vel = 49.5;
 
     // Widely spaced points
     vector<double> ptsx;
     vector<double> ptsy;
 
     // Car reference state
-    double ref_x = car.x;
-    double ref_y = car.y;
-    double ref_yaw = deg2rad(car.yaw);
+    ref.x = car.x;
+    ref.y = car.y;
+    ref.yaw = deg2rad(car.yaw);
 
     if (car.previous_path_size < 2){
 
@@ -108,51 +140,67 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car){
         ptsx.push_back(car.x);
         ptsy.push_back(car.y);
 
+        // Initial values
+        ref.speed = 0;
+        ref.lane = 1;
+
     } else {
 
-        ref_x = car.previous_path_x[car.previous_path_size-1];
-        ref_y = car.previous_path_y[car.previous_path_size-1];
+        ref.x = car.previous_path_x[car.previous_path_size-1];
+        ref.y = car.previous_path_y[car.previous_path_size-1];
 
         double ref_x_prev = car.previous_path_x[car.previous_path_size-2];
         double ref_y_prev = car.previous_path_y[car.previous_path_size-2];
-        ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
+        ref.yaw = atan2(ref.y - ref_y_prev, ref.x - ref_x_prev);
 
         ptsx.push_back(ref_x_prev);
         ptsy.push_back(ref_y_prev);
 
-        ptsx.push_back(ref_x);
-        ptsy.push_back(ref_y);
+        ptsx.push_back(ref.x);
+        ptsy.push_back(ref.y);
 
     }
 
-    vector<double> ref_frenet = getFrenet(ref_x, ref_y, ref_yaw, map.x, map.y);
+    vector<double> ref_frenet = getFrenet(ref.x, ref.y, ref.yaw, map.x, map.y);
     double ref_s = ref_frenet[0];
 
-    // Add 4     evenly-spaced points in Frenet reference frame
-    vector<double> next_p0 = getXY(ref_s+20, (2+4*lane), map.s, map.x, map.y);
-    vector<double> next_p1 = getXY(ref_s+40, (2+4*lane), map.s, map.x, map.y);
-    vector<double> next_p2 = getXY(ref_s+60, (2+4*lane), map.s, map.x, map.y);
-    vector<double> next_p3 = getXY(ref_s+80, (2+4*lane), map.s, map.x, map.y);
+    // Add 3 evenly-spaced points in Frenet reference frame
+    vector<double> next_p0 = getXY(ref_s+30, (2+4*ref.lane), map.s, map.x, map.y);
+    vector<double> next_p1 = getXY(ref_s+60, (2+4*ref.lane), map.s, map.x, map.y);
+    vector<double> next_p2 = getXY(ref_s+90, (2+4*ref.lane), map.s, map.x, map.y);
+    // vector<double> next_p3 = getXY(ref_s+80, (2+4*ref.lane), map.s, map.x, map.y);
 
     ptsx.push_back(next_p0[0]);
     ptsx.push_back(next_p1[0]);
     ptsx.push_back(next_p2[0]);
-    ptsx.push_back(next_p3[0]);
+    // ptsx.push_back(next_p3[0]);
 
     ptsy.push_back(next_p0[1]);
     ptsy.push_back(next_p1[1]);
     ptsy.push_back(next_p2[1]);
-    ptsy.push_back(next_p3[1]);
+    // ptsy.push_back(next_p3[1]);
 
     for(int i = 0; i < ptsx.size(); ++i)
     {
         // shift car reference angle to 0 degrees
-        double shift_x = ptsx[i] - ref_x;
-        double shift_y = ptsy[i] - ref_y;
+        double shift_x = ptsx[i] - ref.x;
+        double shift_y = ptsy[i] - ref.y;
 
-        ptsx[i] = (shift_x * cos(0 - ref_yaw) - shift_y*sin(0-ref_yaw));
-        ptsy[i] = (shift_x * sin(0 - ref_yaw) + shift_y*cos(0-ref_yaw));
+        ptsx[i] = (shift_x * cos(0 - ref.yaw) - shift_y*sin(0-ref.yaw));
+        ptsy[i] = (shift_x * sin(0 - ref.yaw) + shift_y*cos(0-ref.yaw));
 
+    }
+
+    double max_acc = .25;
+
+    // Set trajectory speed
+    if(too_close)
+    {
+        ref.speed -= 2*max_acc;
+    }
+    else if (ref.speed < target_speed)
+    {
+        ref.speed += max_acc;
     }
 
     tk::spline s;
@@ -171,22 +219,20 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car){
     double target_dist = sqrt(pow(target_x,2) + pow(target_y, 2));
     double x_add_on = 0;
 
-    for(int i = 1; i <= 50-car.previous_path_size; ++i)
+    for(int i = 1; i <= 40-car.previous_path_size; ++i)
     {
-        double N = (target_dist / (.02*ref_vel/2.24));
+        double N = (target_dist / (.02*ref.speed/2.24));
         double x_point = x_add_on + (target_x)/N;
         double y_point = s(x_point);
         x_add_on = x_point;
 
+        // From local to global coordinates
         double x_ref = x_point;
         double y_ref = y_point;
-
-        // Rotate back
-        x_point = (x_ref * cos(ref_yaw) - y_ref * sin(ref_yaw));
-        y_point = (x_ref * sin(ref_yaw) + y_ref * cos(ref_yaw));
-
-        x_point += ref_x;
-        y_point += ref_y;
+        x_point = (x_ref * cos(ref.yaw) - y_ref * sin(ref.yaw));
+        y_point = (x_ref * sin(ref.yaw) + y_ref * cos(ref.yaw));
+        x_point += ref.x;
+        y_point += ref.y;
 
         next_x_vals.push_back(x_point);
         next_y_vals.push_back(y_point);

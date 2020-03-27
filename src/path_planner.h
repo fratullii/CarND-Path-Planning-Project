@@ -75,6 +75,21 @@ class PathPlanner{
     std::vector<std::vector<double>> generate_trajectory(Car &car);
 
     private:
+    /**
+     * @brief Reference state
+     *
+     * State of the last point in the trajectory
+     */
+    struct Reference {
+        double x;
+        double y;
+        double yaw;
+        double speed;
+        double acc;
+        double s;
+        double d;
+        int lane;
+    } ref;
 
     Map map;
 
