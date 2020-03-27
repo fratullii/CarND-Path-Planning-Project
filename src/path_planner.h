@@ -91,7 +91,16 @@ class PathPlanner{
         int lane;
     } ref;
 
+    struct checkCar {
+        bool too_close;
+        double speed;
+    };
+
     Map map;
+
+    checkCar check_cars_in_lane(Car &car);
+
+    int ask_lane_change(Car &car, checkCar &inlaneCar);
 
     /**
      * Calculate the Jerk Minimizing Trajectory that connects the initial state

@@ -76,15 +76,15 @@ PathPlanner::PathPlanner(Map& map_in){
     map = map_in;
 }
 
-vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
+PathPlanner::checkCar PathPlanner::check_cars_in_lane(Car &car)
 {
+    // Default values
+    checkCar check_car_info;
+    check_car_info.speed = 49.5;
+    check_car_info.too_close = false;
 
-    // cout << "Lane outside: " << ref.lane << endl;
-
-    // Check for another car in the lane
+    // Maximum distance from other car to react
     double closest_distance = 30;
-    double target_speed = 49.5;
-    bool too_close = false;
     for(int i = 0; i < car.sensor_fusion.size(); ++i)
     {
         float d = car.sensor_fusion[i][6];
@@ -102,18 +102,94 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
 
             if((check_car_s > car.s) && (check_distance < closest_distance))
             {
-                target_speed = check_speed;
+                check_car_info.speed = check_speed;
                 closest_distance = check_distance;
-                too_close = true;
+                check_car_info.too_close = true;
             }
 
         }
     }
 
+    return check_car_info;
+}
 
-    if(too_close)
+int PathPlanner::ask_lane_change(Car &car, checkCar &inlaneCar)
+{
+    // Set distance for which it could not change lane
+    double fw_dist = 30;
+    double bck_dist = 10;
+
+    // Set max distance for where to check
+    double max_fw_dist = 40;
+
+    // Set max back distance to check for incoming vehicle
+    double max_bck_dist = 30;
+
+    // Set current lane and lanes to inspect for lane change
+    int current_lane = ref.lane;
+    vector<int> lanes {0,1,2};
+    vector<int> inspected_lanes;
+    for(int lane: lanes){
+        if(fabs(lane-current_lane)==1){
+            inspected_lanes.push_back(lane);
+        }
+    }
+
+    vector<double> cost(inspected_lanes.size(), 0);
+    cost[current_lane] -= 0.01; // slightly penalize remaining in the lane
+
+    for(int k; k < inspected_lanes.size(); ++k)
     {
-        ref.lane = 2;
+        for(int i = 0; i < car.sensor_fusion.size(); ++i)
+        {
+            float d = car.sensor_fusion[i][6];
+            if (d > (inspected_lanes[k]*4) && d < (inspected_lanes[k]*4+4))
+            {
+                double vx = car.sensor_fusion[i][3];
+                double vy = car.sensor_fusion[i][4];
+                double check_speed = sqrt(vx*vx + vy*vy);
+                double check_car_s = car.sensor_fusion[i][5];
+                double check_distance = check_car_s-car.s;
+                check_car_s += ((double)car.previous_path_size*0.02*check_speed);
+
+                if(check_distance > -bck_dist && check_distance < fw_dist)
+                {
+                    // Heavily penalize if a car very close to ego vehicle
+                    cost[lanes[inspected_lanes[k]]] -= 5;
+                }
+                else if(check_distance > fw_dist && check_distance < max_fw_dist)
+                {
+                    // Check that cars ahead in other lanes are going fast enough
+                    if((inlaneCar.speed - check_speed) < 0)
+                    {
+                        cost[lanes[inspected_lanes[k]]] -= 1;
+                    } else
+                    {
+                        cost[lanes[inspected_lanes[k]]] += (inlaneCar.speed - check_speed) / check_speed;
+                    }
+                }
+                else if(check_distance < -bck_dist && check_distance > -max_bck_dist)
+                {
+                    // Check that cars below are not going too fast
+                    cost[lanes[inspected_lanes[k]]] -= (inlaneCar.speed - ref.speed) / ref.speed * 2;
+                }
+            }
+        }
+    }
+
+    int assigned_lane = std::distance(cost.begin(), std::max_element(cost.begin(),cost.end()));
+    return assigned_lane;
+}
+
+vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
+{
+
+    // Check if there are slower cars in ego vehicle's lane
+    checkCar check_info = check_cars_in_lane(car);
+
+    if(check_info.too_close)
+    {
+        ref.lane = ask_lane_change(car, check_info);
     }
 
     // Vectors of x, y trajectory coordinates
@@ -129,8 +205,8 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
     ref.y = car.y;
     ref.yaw = deg2rad(car.yaw);
 
-    if (car.previous_path_size < 2){
-
+    if (car.previous_path_size < 2)
+    {
         double prev_car_x = car.x - cos(car.yaw);
         double prev_car_y = car.y - sin(car.yaw);
 
@@ -143,9 +219,9 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
         // Initial values
         ref.speed = 0;
         ref.lane = 1;
-
-    } else {
-
+    }
+    else
+    {
         ref.x = car.previous_path_x[car.previous_path_size-1];
         ref.y = car.previous_path_y[car.previous_path_size-1];
 
@@ -158,7 +234,6 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
 
         ptsx.push_back(ref.x);
         ptsy.push_back(ref.y);
-
     }
 
     vector<double> ref_frenet = getFrenet(ref.x, ref.y, ref.yaw, map.x, map.y);
@@ -188,17 +263,16 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
 
         ptsx[i] = (shift_x * cos(0 - ref.yaw) - shift_y*sin(0-ref.yaw));
         ptsy[i] = (shift_x * sin(0 - ref.yaw) + shift_y*cos(0-ref.yaw));
-
     }
 
     double max_acc = .25;
 
     // Set trajectory speed
-    if(too_close)
+    if(check_info.too_close)
     {
         ref.speed -= 2*max_acc;
     }
-    else if (ref.speed < target_speed)
+    else if (ref.speed < check_info.speed)
     {
         ref.speed += max_acc;
     }
@@ -219,7 +293,7 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
     double target_dist = sqrt(pow(target_x,2) + pow(target_y, 2));
     double x_add_on = 0;
 
-    for(int i = 1; i <= 40-car.previous_path_size; ++i)
+    for(int i = 1; i <= 25-car.previous_path_size; ++i)
     {
         double N = (target_dist / (.02*ref.speed/2.24));
         double x_point = x_add_on + (target_x)/N;
