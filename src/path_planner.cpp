@@ -135,7 +135,7 @@ double PathPlanner::cost_close_vehicle(const int c_lane, const double dist)
 
 double PathPlanner::cost_side_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist)
 {
-    double range_dist = 30;
+    double range_dist = 50;
     double speed_diff = (c_speed - car_speed) / 2.24;
 
     double cost;
@@ -143,9 +143,9 @@ double PathPlanner::cost_side_vehicle(const int c_lane, const double c_speed, co
     {
         cost = 25;
     }
-    else
+    else if (dist < 0)
     {
-        cost = -3;
+        cost = dist / 10;
     }
 
     return cost;
@@ -159,9 +159,9 @@ double PathPlanner::cost_next_vehicle(const int c_lane, const double c_speed, co
     {
         cost = 5;
     }
-    else
+    else if (dist > 0)
     {
-        cost = -1;
+        cost = - dist/20;
     }
 }
 
@@ -180,6 +180,7 @@ int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
 
     // Compute cost
     vector<double> cost(insp_lanes.size(),0);
+    vector<double> no_car(insp_lanes.size(), true);
 
     for(int i = 0; i < car.sensor_fusion.size(); ++i)
     {
@@ -195,6 +196,9 @@ int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
             double check_car_s = car.sensor_fusion[i][5];
             double check_distance = check_car_s-car.s;
 
+            // Count cars in lane
+            no_car[idx] = false;
+
             // Penalize lane change if there any cars close to the vehicle on near lane(s)
             cost[idx] += cost_close_vehicle(check_lane, check_distance);
 
@@ -204,6 +208,12 @@ int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
             // Penalize lane change if cars in the side mirrors are coming too fast
             cost[idx] += cost_next_vehicle(check_lane, check_speed, car.speed, check_distance, inLaneCar);
         }
+    }
+
+    // Reward lane if there are no cars
+    for(int k = 0; k < no_car.size(), ++k)
+    {
+        if((insp_lanes[k] != ref.lane) && no_car[k]) { cost[k] -= 50; }
     }
 
     int best_cost_idx = std::min_element(cost.begin(), cost.end()) - cost.begin();
