@@ -65,6 +65,12 @@ struct Car {
     void readTelemetry(nlohmann::json &json_data);
 };
 
+struct checkCar {
+    bool too_close;
+    double speed;
+    double distance;
+};
+
 class PathPlanner{
     public:
 
@@ -91,11 +97,6 @@ class PathPlanner{
         int lane;
     } ref;
 
-    struct checkCar {
-        bool too_close;
-        double speed;
-    };
-
     Map map;
 
     checkCar check_cars_in_lane(Car &car);
@@ -104,6 +105,7 @@ class PathPlanner{
 
     double cost_close_vehicle(const int c_lane, const double dist);
     double cost_side_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist);
+    double cost_next_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist, const checkCar& l_car);
 
     /**
      * Calculate the Jerk Minimizing Trajectory that connects the initial state

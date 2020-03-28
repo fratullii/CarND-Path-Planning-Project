@@ -77,7 +77,7 @@ PathPlanner::PathPlanner(Map& map_in){
     map = map_in;
 }
 
-PathPlanner::checkCar PathPlanner::check_cars_in_lane(Car &car)
+checkCar PathPlanner::check_cars_in_lane(Car &car)
 {
     // Default values
     checkCar check_car_info;
@@ -86,6 +86,7 @@ PathPlanner::checkCar PathPlanner::check_cars_in_lane(Car &car)
 
     // Maximum distance from other car to react
     double closest_distance = 30;
+
     for(int i = 0; i < car.sensor_fusion.size(); ++i)
     {
         float d = car.sensor_fusion[i][6];
@@ -102,8 +103,9 @@ PathPlanner::checkCar PathPlanner::check_cars_in_lane(Car &car)
 
             if((check_car_s > car.s) && (check_distance < closest_distance))
             {
-                check_car_info.speed = check_speed;
                 closest_distance = check_distance;
+                check_car_info.speed = check_speed;
+                check_car_info.distance = check_distance;
                 check_car_info.too_close = true;
             }
 
@@ -116,15 +118,14 @@ PathPlanner::checkCar PathPlanner::check_cars_in_lane(Car &car)
 double PathPlanner::cost_close_vehicle(const int c_lane, const double dist)
 {
     // Set distance for which it could not change lane
-    double fw_dist = 10;
+    double fw_dist = 20;
     double bck_dist = 10;
 
     double cost;
-
     if((c_lane != ref.lane) && (dist > -bck_dist) && (dist < fw_dist))
     {
-        cost = - 5;
-    } else if (c_lane != ref.lane)
+        cost = - 50;
+    } else
     {
         cost = 1;
     }
@@ -134,7 +135,34 @@ double PathPlanner::cost_close_vehicle(const int c_lane, const double dist)
 
 double PathPlanner::cost_side_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist)
 {
-    return 0;
+    double range_dist = 30;
+    double speed_diff = (c_speed - car_speed) / 2.24;
+
+    double cost;
+    if((c_lane != ref.lane) && (dist < 0) && (dist > -range_dist) && (speed_diff < dist))
+    {
+        cost = -3;
+    }
+    else
+    {
+        cost = 1;
+    }
+
+    return cost;
+}
+
+double PathPlanner::cost_next_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist, const checkCar& l_car)
+{
+    double range_dist = l_car.distance + 15;
+    double cost;
+    if((dist > 0) && (dist < range_dist) && (c_speed < l_car.speed))
+    {
+        cost = -3;
+    }
+    else
+    {
+        cost = 1;
+    }
 }
 
 int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
@@ -153,12 +181,14 @@ int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
     // Compute cost
     vector<double> cost(insp_lanes.size(),0);
 
+    // Immediately pick a void lane if there is any
+
     for(int i = 0; i < car.sensor_fusion.size(); ++i)
     {
         float d = car.sensor_fusion[i][6];
         int check_lane = floor(d/4);
         auto it = std::find(insp_lanes.begin(), insp_lanes.end(), check_lane);
-        if(it != insp_lanes.end())
+        if(it != insp_lanes.end() && (check_lane != ref.lane))
         {
             int idx = it - insp_lanes.begin();
             double vx = car.sensor_fusion[i][3];
@@ -171,7 +201,10 @@ int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
             cost[idx] += cost_close_vehicle(check_lane, check_distance);
 
             // Penalize lane change if cars in the side mirrors are coming too fast
+            cost[idx] += cost_side_vehicle(check_lane, check_speed, car.speed, check_distance);
 
+            // Penalize lane change if cars in the side mirrors are coming too fast
+            cost[idx] += cost_next_vehicle(check_lane, check_speed, car.speed, check_distance, inLaneCar);
         }
     }
 
