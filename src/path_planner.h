@@ -100,7 +100,10 @@ class PathPlanner{
 
     checkCar check_cars_in_lane(Car &car);
 
-    int ask_lane_change(Car &car, checkCar &inlaneCar);
+    int ask_lane_change(const Car &car, const checkCar &inLaneCar);
+
+    double cost_close_vehicle(const int c_lane, const double dist);
+    double cost_side_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist);
 
     /**
      * Calculate the Jerk Minimizing Trajectory that connects the initial state
