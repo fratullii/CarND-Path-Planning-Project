@@ -122,12 +122,12 @@ double PathPlanner::cost_close_vehicle(const int c_lane, const double dist)
     double bck_dist = 10;
 
     double cost;
-    if((c_lane != ref.lane) && (dist > -bck_dist) && (dist < fw_dist))
+    if((dist > -bck_dist) && (dist < fw_dist))
     {
-        cost = - 50;
+        cost = 50;
     } else
     {
-        cost = 1;
+        cost = 0;
     }
 
     return cost;
@@ -139,13 +139,13 @@ double PathPlanner::cost_side_vehicle(const int c_lane, const double c_speed, co
     double speed_diff = (c_speed - car_speed) / 2.24;
 
     double cost;
-    if((c_lane != ref.lane) && (dist < 0) && (dist > -range_dist) && (speed_diff < dist))
+    if((dist < 0) && (dist > -range_dist) && (speed_diff > dist))
     {
-        cost = -3;
+        cost = 25;
     }
     else
     {
-        cost = 1;
+        cost = -3;
     }
 
     return cost;
@@ -157,11 +157,11 @@ double PathPlanner::cost_next_vehicle(const int c_lane, const double c_speed, co
     double cost;
     if((dist > 0) && (dist < range_dist) && (c_speed < l_car.speed))
     {
-        cost = -3;
+        cost = 5;
     }
     else
     {
-        cost = 1;
+        cost = -1;
     }
 }
 
@@ -180,8 +180,6 @@ int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
 
     // Compute cost
     vector<double> cost(insp_lanes.size(),0);
-
-    // Immediately pick a void lane if there is any
 
     for(int i = 0; i < car.sensor_fusion.size(); ++i)
     {
@@ -208,7 +206,7 @@ int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
         }
     }
 
-    int best_cost_idx = std::max_element(cost.begin(), cost.end()) - cost.begin();
+    int best_cost_idx = std::min_element(cost.begin(), cost.end()) - cost.begin();
     int best_lane = insp_lanes[best_cost_idx];
 
     return best_lane;
