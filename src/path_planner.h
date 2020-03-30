@@ -65,7 +65,7 @@ struct Car {
     void readTelemetry(nlohmann::json &json_data);
 };
 
-struct checkCar {
+struct CheckCar {
     bool flag;
     bool too_close;
     double speed;
@@ -114,37 +114,22 @@ class PathPlanner{
 
     Map map;
 
-    checkCar check_cars_in_lane(Car &car);
+    CheckCar check_cars_in_lane(Car &car);
 
-    void ask_lane_change(const Car &car, const checkCar &inLaneCar);
+    void ask_lane_change(const Car &car, const CheckCar &inLaneCar);
+    void compute_trajectory(std::vector<double>& next_x_vals, std::vector<double>& next_y_vals, Car& car,const CheckCar &check_info);
 
     int previous_lane;
+
+    double acc = .25;
+    double max_speed = 49.5;
 
     Timer lane_change_timer;
 
     double cost_close_vehicle(const int c_lane, const double dist);
     double cost_side_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist);
-    double cost_next_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist, const checkCar& l_car);
+    double cost_next_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist, const CheckCar& l_car);
 
-    /**
-     * Calculate the Jerk Minimizing Trajectory that connects the initial state
-     * to the final state in time T.
-     *
-     * @param start - the vehicles start location given as a length three array
-     *   corresponding to initial values of [s, s_dot, s_double_dot]
-     * @param end - the desired end state for vehicle. Like "start" this is a
-     *   length three array.
-     * @param T - The duration, in seconds, over which this maneuver should occur.
-     *
-     * @return an array of length 6, each value corresponding to a coefficent in 
-     *   the polynomial:
-     *   s(t) = a_0 + a_1 * t + a_2 * t**2 + a_3 * t**3 + a_4 * t**4 + a_5 * t**5
-     *
-     * EXAMPLE
-     *   > JMT([0, 10, 0], [10, 10, 0], 1)
-     *     [0.0, 10.0, 0.0, 0.0, 0.0, 0.0]
-     */
-    std::vector<double> JMT(std::vector<double> &start, std::vector<double> &end, double T);
 };
 
 #endif //  PATHPLANNER_H_

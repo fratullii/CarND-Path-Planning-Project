@@ -5,18 +5,12 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-#include "Eigen-3.3/Eigen/Dense"
+#include <math.h>
 #include "helpers.h"
 #include "json.hpp"
 #include "spline.h"
 
 using std::vector;
-using Eigen::MatrixXd;
-using Eigen::VectorXd;
-
-// debug
-using std::cout;
-using std::endl;;
 using nlohmann::json;
 
 Map::Map(string map_file_){
@@ -77,13 +71,12 @@ PathPlanner::PathPlanner(Map& map_in){
     map = map_in;
 }
 
-checkCar PathPlanner::check_cars_in_lane(Car &car)
+CheckCar PathPlanner::check_cars_in_lane(Car &car)
 {
     // Default values
-    checkCar check_car_info;
+    CheckCar check_car_info;
     check_car_info.flag = false;
     check_car_info.distance = 1000;
-    check_car_info.speed = 49.5;
     check_car_info.too_close = false;
 
     // Maximum distance from other car to react
@@ -154,7 +147,7 @@ double PathPlanner::cost_side_vehicle(const int c_lane, const double c_speed, co
     return cost;
 }
 
-double PathPlanner::cost_next_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist, const checkCar& l_car)
+double PathPlanner::cost_next_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist, const CheckCar& l_car)
 {
     double range_dist = l_car.distance + 15;
     double cost;
@@ -168,7 +161,7 @@ double PathPlanner::cost_next_vehicle(const int c_lane, const double c_speed, co
     }
 }
 
-void PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
+void PathPlanner::ask_lane_change(const Car &car, const CheckCar &inLaneCar)
 {
 
     // Compute lanes
@@ -234,28 +227,14 @@ void PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
     if(best_lane != previous_lane) {lane_change_timer.set_timer(3.0); }
 }
 
-vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
+void PathPlanner::compute_trajectory(std::vector<double>& next_x_vals, std::vector<double>& next_y_vals, Car& car,const CheckCar &check_info)
 {
-
-    // Check if there are slower cars in ego vehicle's lane
-    checkCar check_info = check_cars_in_lane(car);
-
-    // If car ahead is too slow, check if lane change is both feasible and convenient
-    lane_change_timer.update_timer(0.02);
-    if(check_info.too_close)
-    {
-        ask_lane_change(car, check_info);
-    }
-
-    // Vectors of x, y trajectory coordinates
-    vector<double> next_x_vals;
-    vector<double> next_y_vals;
 
     // Widely spaced points
     vector<double> ptsx;
     vector<double> ptsy;
 
-    // Car reference state
+    // Update Car reference state
     ref.x = car.x;
     ref.y = car.y;
     ref.yaw = deg2rad(car.yaw);
@@ -320,16 +299,18 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
         ptsy[i] = (shift_x * sin(0 - ref.yaw) + shift_y*cos(0-ref.yaw));
     }
 
-    double max_acc = .25;
-
-    // Set trajectory speed
-    if(check_info.too_close && (ref.speed > check_info.speed))
+    // Set speed
+    double target_speed;
+    target_speed = check_info.too_close ? check_info.speed : max_speed;
+    if(ref.speed > target_speed)
     {
-        ref.speed -= std::min(max_acc,(ref.speed - check_info.speed));
+        // Accelerate
+        ref.speed -= std::min(acc,(ref.speed - target_speed));
     }
-    else if (ref.speed < check_info.speed)
+    else if (ref.speed < target_speed)
     {
-        ref.speed += std::min(max_acc, (check_info.speed - ref.speed));
+        // Brake
+        ref.speed += std::min(acc, (target_speed - ref.speed));
     }
 
     tk::spline s;
@@ -366,33 +347,27 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
         next_x_vals.push_back(x_point);
         next_y_vals.push_back(y_point);
     }
+}
+
+vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
+{
+
+    // Check if there are slower cars in ego vehicle's lane
+    CheckCar check_info = check_cars_in_lane(car);
+
+    // If car ahead is too slow, check if lane change is both feasible and convenient
+    lane_change_timer.update_timer(0.02);
+    if(check_info.too_close)
+    {
+        ask_lane_change(car, check_info);
+    }
+
+    // Obtain trajectory coordinate in x, y points
+    vector<double> next_x_vals;
+    vector<double> next_y_vals;
+    compute_trajectory(next_x_vals, next_y_vals, car, check_info);
 
     vector<vector<double>> next_vals {next_x_vals, next_y_vals};
 
     return next_vals;
-}
-
-vector<double> PathPlanner::JMT(vector<double> &start, vector<double> &end, double T) {
-
-    MatrixXd A = MatrixXd(3, 3);
-    A << T*T*T, T*T*T*T, T*T*T*T*T,
-        3*T*T, 4*T*T*T,5*T*T*T*T,
-        6*T, 12*T*T, 20*T*T*T;
-
-    MatrixXd B = MatrixXd(3,1);
-    B << end[0]-(start[0]+start[1]*T+.5*start[2]*T*T),
-        end[1]-(start[1]+start[2]*T),
-        end[2]-start[2];
-
-    MatrixXd Ai = A.inverse();
-
-    MatrixXd C = Ai*B;
-
-    vector <double> result = {start[0], start[1], .5*start[2]};
-
-    for(int i = 0; i < C.size(); ++i) {
-    result.push_back(C.data()[i]);
-    }
-
-    return result;
 }
