@@ -349,7 +349,7 @@ void PathPlanner::compute_trajectory(std::vector<double>& next_x_vals, std::vect
     }
 }
 
-vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
+void PathPlanner::generate_trajectory(vector<double>& next_x_vals, vector<double>& next_y_vals, Car &car)
 {
 
     // Check if there are slower cars in ego vehicle's lane
@@ -363,11 +363,5 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
     }
 
     // Obtain trajectory coordinate in x, y points
-    vector<double> next_x_vals;
-    vector<double> next_y_vals;
     compute_trajectory(next_x_vals, next_y_vals, car, check_info);
-
-    vector<vector<double>> next_vals {next_x_vals, next_y_vals};
-
-    return next_vals;
 }

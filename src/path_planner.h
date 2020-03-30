@@ -87,13 +87,14 @@ class Timer {
 };
 
 class PathPlanner{
+
     public:
 
     PathPlanner(Map&);
 
     virtual ~PathPlanner() {};
 
-    std::vector<std::vector<double>> generate_trajectory(Car &car);
+    void generate_trajectory(std::vector<double>& next_x_vals, std::vector<double>& next_y_vals,Car &car);
 
     private:
     /**

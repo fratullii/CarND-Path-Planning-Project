@@ -51,14 +51,10 @@ int main() {
           vector<double> next_y_vals;
 
           /**
-           * TODO: define a path made up of (x,y) points that the car will visit
-           *   sequentially every .02 seconds
+           * Defines a path made up of (x,y) points that the car will visit
+           * sequentially every .02 seconds
            */
-          vector<vector<double>> next_vals;
-          next_vals = path_planner.generate_trajectory(car);
-
-          next_x_vals = next_vals[0];
-          next_y_vals = next_vals[1];
+          path_planner.generate_trajectory(next_x_vals, next_y_vals, car);
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
