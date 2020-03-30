@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "json.hpp"
+#include "spline.h"
 
 struct Map {
 
@@ -23,7 +24,7 @@ struct Map {
 
     /**
      * @brief Construct a new Map object
-     * 
+     *
      * @param map_file_ string where to read a map file from
      */
     Map(std::string map_file_);
@@ -65,7 +66,7 @@ struct Car {
     void readTelemetry(nlohmann::json &json_data);
 };
 
-struct checkCar {
+struct CheckCar {
     bool flag;
     bool too_close;
     double speed;
@@ -82,20 +83,36 @@ class Timer {
     inline void set_timer(double t) {time = t; };
     inline double get_time() {return time; };
 
-    inline void update_timer(double time_step) {time = std::max(0., time-time_step); };
+    inline void update_timer(double time_step) {
+        time = std::max(0., time-time_step);
+    };
     inline bool is_ready() {return (time == 0);};
 };
 
 class PathPlanner{
+
     public:
 
     PathPlanner(Map&);
 
     virtual ~PathPlanner() {};
 
-    std::vector<std::vector<double>> generate_trajectory(Car &car);
+    /**
+     * @brief Generate trajectory for highway driving
+     * 
+     * Writes on two vectors containing the trajectory coordinates the car
+     * will have to follow
+     * 
+     * @param next_x_vals vector<double> with trajectory x points
+     * @param next_y_vals vector<double> with trajectory x points
+     * @param car Car object with ego vehicle's telemetry information
+     */
+    void generate_trajectory( std::vector<double>& next_x_vals,
+                              std::vector<double>& next_y_vals,
+                              Car &car );
 
     private:
+
     /**
      * @brief Reference state
      *
@@ -113,38 +130,72 @@ class PathPlanner{
     } ref;
 
     Map map;
-
-    checkCar check_cars_in_lane(Car &car);
-
-    void ask_lane_change(const Car &car, const checkCar &inLaneCar);
-
-    int previous_lane;
-
+    CheckCar check_cars_in_lane(Car &car);
     Timer lane_change_timer;
+    int previous_lane;
+    double acc;
+    double max_speed;
 
-    double cost_close_vehicle(const int c_lane, const double dist);
-    double cost_side_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist);
-    double cost_next_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist, const checkCar& l_car);
+    void ask_lane_change(const Car &car, const CheckCar &inLaneCar);
+
+    void compute_trajectory( std::vector<double>& next_x_vals,
+                             std::vector<double>& next_y_vals, 
+                             Car& car );
+
+    tk::spline compute_spline(Car &car);
+
+    void select_speed(const CheckCar& check_info);
+
+    
+    /**
+     * @brief Cost of close vehicle in other lane
+     * 
+     * Check if the vehicle in the other lane is close to the ego vehicle and
+     * computes the cost
+     * 
+     * @param c_lane other vehicle lane
+     * @param dist relative distance between other vehicle and ego vehicle
+     * @return double cost
+     */
+    double cost_close_vehicle( const int c_lane,
+                               const double dist );
 
     /**
-     * Calculate the Jerk Minimizing Trajectory that connects the initial state
-     * to the final state in time T.
-     *
-     * @param start - the vehicles start location given as a length three array
-     *   corresponding to initial values of [s, s_dot, s_double_dot]
-     * @param end - the desired end state for vehicle. Like "start" this is a
-     *   length three array.
-     * @param T - The duration, in seconds, over which this maneuver should occur.
-     *
-     * @return an array of length 6, each value corresponding to a coefficent in 
-     *   the polynomial:
-     *   s(t) = a_0 + a_1 * t + a_2 * t**2 + a_3 * t**3 + a_4 * t**4 + a_5 * t**5
-     *
-     * EXAMPLE
-     *   > JMT([0, 10, 0], [10, 10, 0], 1)
-     *     [0.0, 10.0, 0.0, 0.0, 0.0, 0.0]
+     * @brief Cost of vehicle behind
+     * 
+     * Check if the vehicle in the other lane and behind the ego vehicle is
+     * going too fast and computes the cost
+     * 
+     * @param c_lane other vehicle's lane
+     * @param c_speed other vehicle's speed
+     * @param car_speed ego vehicle's speed
+     * @param dist relative distance between other vehicle and ego vehicle
+     * @return double cost
      */
-    std::vector<double> JMT(std::vector<double> &start, std::vector<double> &end, double T);
+    double cost_incoming_vehicle( const int c_lane,
+                                  const double c_speed,
+                                  const double car_speed,
+                                  const double dist );
+
+    /**
+     * @brief Cost of vehicle ahead
+     * 
+     * Check if the vehicle in the other lane and ahead of the ego vehicle
+     * are fast going fast enough to make the lane change maneuver convenient
+     * 
+     * @param c_lane other vehicle's lane
+     * @param c_speed other vehicle's speed
+     * @param car_speed ego vehicle's speed
+     * @param dist relative distance between other vehicle and ego vehicle
+     * @param l_car next vehicle in the ego vehicle's lane
+     * @return double cost
+     */
+    double cost_next_vehicle( const int c_lane,
+                              const double c_speed,
+                              const double car_speed,
+                              const double dist,
+                              const CheckCar& l_car );
+
 };
 
 #endif //  PATHPLANNER_H_
