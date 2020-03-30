@@ -133,8 +133,8 @@ class PathPlanner{
     CheckCar check_cars_in_lane(Car &car);
     Timer lane_change_timer;
     int previous_lane;
-    double acc = .25;
-    double max_speed = 49.5;
+    double acc;
+    double max_speed;
 
     void ask_lane_change(const Car &car, const CheckCar &inLaneCar);
 

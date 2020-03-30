@@ -67,7 +67,9 @@ void Car::readTelemetry(json &json_data){
     sensor_fusion = json_data[1]["sensor_fusion"];
 }
 
-PathPlanner::PathPlanner(Map& map_in){
+PathPlanner::PathPlanner(Map& map_in)
+    : acc(0.25), max_speed(49.5)
+{
     map = map_in;
 
     // Initial values
