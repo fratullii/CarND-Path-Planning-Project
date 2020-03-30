@@ -227,6 +227,12 @@ void PathPlanner::ask_lane_change(const Car &car, const CheckCar &inLaneCar)
     if(best_lane != previous_lane) {lane_change_timer.set_timer(3.0); }
 }
 
+tk::spline PathPlanner::compute_spline(Car &Car)
+{
+    tk::spline s;
+    return s;
+}
+
 void PathPlanner::compute_trajectory(std::vector<double>& next_x_vals, std::vector<double>& next_y_vals, Car& car,const CheckCar &check_info)
 {
 
@@ -277,17 +283,14 @@ void PathPlanner::compute_trajectory(std::vector<double>& next_x_vals, std::vect
     vector<double> next_p0 = getXY(ref_s+30, (2+4*ref.lane), map.s, map.x, map.y);
     vector<double> next_p1 = getXY(ref_s+60, (2+4*ref.lane), map.s, map.x, map.y);
     vector<double> next_p2 = getXY(ref_s+90, (2+4*ref.lane), map.s, map.x, map.y);
-    // vector<double> next_p3 = getXY(ref_s+80, (2+4*ref.lane), map.s, map.x, map.y);
 
     ptsx.push_back(next_p0[0]);
     ptsx.push_back(next_p1[0]);
     ptsx.push_back(next_p2[0]);
-    // ptsx.push_back(next_p3[0]);
 
     ptsy.push_back(next_p0[1]);
     ptsy.push_back(next_p1[1]);
     ptsy.push_back(next_p2[1]);
-    // ptsy.push_back(next_p3[1]);
 
     for(int i = 0; i < ptsx.size(); ++i)
     {

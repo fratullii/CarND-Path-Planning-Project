@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "json.hpp"
+#include "spline.h"
 
 struct Map {
 
@@ -119,9 +120,9 @@ class PathPlanner{
 
     void ask_lane_change(const Car &car, const CheckCar &inLaneCar);
     void compute_trajectory(std::vector<double>& next_x_vals, std::vector<double>& next_y_vals, Car& car,const CheckCar &check_info);
+    tk::spline compute_spline(Car &car);
 
     int previous_lane;
-
     double acc = .25;
     double max_speed = 49.5;
 
