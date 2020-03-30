@@ -303,69 +303,7 @@ void PathPlanner::compute_trajectory(std::vector<double>& next_x_vals, std::vect
     ref.y = car.y;
     ref.yaw = deg2rad(car.yaw);
 
-    // Widely spaced points
-    vector<double> ptsx;
-    vector<double> ptsy;
-
-    if (car.previous_path_size < 2)
-    {
-        double prev_car_x = car.x - cos(car.yaw);
-        double prev_car_y = car.y - sin(car.yaw);
-
-        ptsx.push_back(prev_car_x);
-        ptsy.push_back(prev_car_y);
-
-        ptsx.push_back(car.x);
-        ptsy.push_back(car.y);
-
-        // Initial values
-        ref.speed = 0;
-        ref.lane = 1;
-    }
-    else
-    {
-        ref.x = car.previous_path_x[car.previous_path_size-1];
-        ref.y = car.previous_path_y[car.previous_path_size-1];
-
-        double ref_x_prev = car.previous_path_x[car.previous_path_size-2];
-        double ref_y_prev = car.previous_path_y[car.previous_path_size-2];
-        ref.yaw = atan2(ref.y - ref_y_prev, ref.x - ref_x_prev);
-
-        ptsx.push_back(ref_x_prev);
-        ptsy.push_back(ref_y_prev);
-
-        ptsx.push_back(ref.x);
-        ptsy.push_back(ref.y);
-    }
-
-    vector<double> ref_frenet = getFrenet(ref.x, ref.y, ref.yaw, map.x, map.y);
-    double ref_s = ref_frenet[0];
-
-    // Add 3 evenly-spaced points in Frenet reference frame
-    vector<double> next_p0 = getXY(ref_s+30, (2+4*ref.lane), map.s, map.x, map.y);
-    vector<double> next_p1 = getXY(ref_s+60, (2+4*ref.lane), map.s, map.x, map.y);
-    vector<double> next_p2 = getXY(ref_s+90, (2+4*ref.lane), map.s, map.x, map.y);
-
-    ptsx.push_back(next_p0[0]);
-    ptsx.push_back(next_p1[0]);
-    ptsx.push_back(next_p2[0]);
-
-    ptsy.push_back(next_p0[1]);
-    ptsy.push_back(next_p1[1]);
-    ptsy.push_back(next_p2[1]);
-
-    for(int i = 0; i < ptsx.size(); ++i)
-    {
-        // shift car reference angle to 0 degrees
-        double shift_x = ptsx[i] - ref.x;
-        double shift_y = ptsy[i] - ref.y;
-
-        ptsx[i] = (shift_x * cos(0 - ref.yaw) - shift_y*sin(0-ref.yaw));
-        ptsy[i] = (shift_x * sin(0 - ref.yaw) + shift_y*cos(0-ref.yaw));
-    }
-
-    tk::spline s;
-    s.set_points(ptsx, ptsy);
+    tk::spline s = compute_spline(car);
 
     // Set speed
     double target_speed;
