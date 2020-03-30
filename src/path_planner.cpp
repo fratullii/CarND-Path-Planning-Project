@@ -81,32 +81,35 @@ checkCar PathPlanner::check_cars_in_lane(Car &car)
 {
     // Default values
     checkCar check_car_info;
+    check_car_info.flag = false;
+    check_car_info.distance = 1000;
     check_car_info.speed = 49.5;
     check_car_info.too_close = false;
 
     // Maximum distance from other car to react
-    double closest_distance = 30;
+    double safety_distance = 30;
 
     for(int i = 0; i < car.sensor_fusion.size(); ++i)
     {
         float d = car.sensor_fusion[i][6];
+        double check_s = car.sensor_fusion[i][5];
 
-        if (d > (ref.lane*4) && d < (ref.lane*4+4))
+        // If car is in the same lane and it is preceding us
+        if ((floor(d/4) == ref.lane) && (check_s > car.s))
         {
             double vx = car.sensor_fusion[i][3];
             double vy = car.sensor_fusion[i][4];
-            double check_speed = sqrt(vx*vx + vy*vy);
-            double check_car_s = car.sensor_fusion[i][5];
-            double check_distance = check_car_s-car.s;
+            double check_speed = sqrt(vx*vx + vy*vy) * 2.24;
+            double check_distance = check_s - car.s;
 
-            check_car_s += ((double)car.previous_path_size*0.02*check_speed);
+            check_s += ((double)car.previous_path_size*0.02*check_speed/2.24);
 
-            if((check_car_s > car.s) && (check_distance < closest_distance))
+            if((check_s > car.s) && (check_distance < safety_distance))
             {
-                closest_distance = check_distance;
+                check_car_info.distance = check_distance;
+                check_car_info.too_close = (check_distance < safety_distance);
                 check_car_info.speed = check_speed;
                 check_car_info.distance = check_distance;
-                check_car_info.too_close = true;
             }
 
         }
@@ -124,7 +127,7 @@ double PathPlanner::cost_close_vehicle(const int c_lane, const double dist)
     double cost;
     if((dist > -bck_dist) && (dist < fw_dist))
     {
-        cost = 50;
+        cost = 10000;
     } else
     {
         cost = 0;
@@ -136,7 +139,7 @@ double PathPlanner::cost_close_vehicle(const int c_lane, const double dist)
 double PathPlanner::cost_side_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist)
 {
     double range_dist = 50;
-    double speed_diff = (c_speed - car_speed) / 2.24;
+    double speed_diff = (c_speed - car_speed)/2.24;
 
     double cost;
     if((dist < 0) && (dist > -range_dist) && (speed_diff > dist))
@@ -165,11 +168,10 @@ double PathPlanner::cost_next_vehicle(const int c_lane, const double c_speed, co
     }
 }
 
-int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
+void PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
 {
 
     // Compute lanes
-    int current_lane = ref.lane;
     vector<int> insp_lanes;
     switch(ref.lane)
     {
@@ -192,7 +194,7 @@ int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
             int idx = it - insp_lanes.begin();
             double vx = car.sensor_fusion[i][3];
             double vy = car.sensor_fusion[i][4];
-            double check_speed = sqrt(vx*vx + vy*vy);
+            double check_speed = sqrt(vx*vx + vy*vy) * 2.24;
             double check_car_s = car.sensor_fusion[i][5];
             double check_distance = check_car_s-car.s;
 
@@ -211,15 +213,25 @@ int PathPlanner::ask_lane_change(const Car &car, const checkCar &inLaneCar)
     }
 
     // Reward lane if there are no cars
-    for(int k = 0; k < no_car.size(), ++k)
+    for(int k = 0; k < no_car.size(); ++k)
     {
-        if((insp_lanes[k] != ref.lane) && no_car[k]) { cost[k] -= 50; }
+        if((insp_lanes[k] != ref.lane) && no_car[k])\
+        {
+            cost[k] -= 50;
+        }
     }
 
+    // Stop from returning to previous lane before 3 s from last lane change
+    int previous_lane_idx = std::find(insp_lanes.begin(), insp_lanes.end(), previous_lane) - insp_lanes.begin();
+    if(!lane_change_timer.is_ready()) { cost[previous_lane_idx] += 1000; }
+
+    // Select lanes with smallest cost
     int best_cost_idx = std::min_element(cost.begin(), cost.end()) - cost.begin();
     int best_lane = insp_lanes[best_cost_idx];
 
-    return best_lane;
+    previous_lane = ref.lane;
+    ref.lane = best_lane;
+    if(best_lane != previous_lane) {lane_change_timer.set_timer(3.0); }
 }
 
 vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
@@ -228,9 +240,11 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
     // Check if there are slower cars in ego vehicle's lane
     checkCar check_info = check_cars_in_lane(car);
 
+    // If car ahead is too slow, check if lane change is both feasible and convenient
+    lane_change_timer.update_timer(0.02);
     if(check_info.too_close)
     {
-        ref.lane = ask_lane_change(car, check_info);
+        ask_lane_change(car, check_info);
     }
 
     // Vectors of x, y trajectory coordinates
@@ -309,13 +323,13 @@ vector<vector<double>> PathPlanner::generate_trajectory(Car &car)
     double max_acc = .25;
 
     // Set trajectory speed
-    if(check_info.too_close)
+    if(check_info.too_close && (ref.speed > check_info.speed))
     {
-        ref.speed -= 2*max_acc;
+        ref.speed -= std::min(max_acc,(ref.speed - check_info.speed));
     }
     else if (ref.speed < check_info.speed)
     {
-        ref.speed += max_acc;
+        ref.speed += std::min(max_acc, (check_info.speed - ref.speed));
     }
 
     tk::spline s;
