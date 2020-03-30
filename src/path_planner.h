@@ -119,8 +119,9 @@ class PathPlanner{
     CheckCar check_cars_in_lane(Car &car);
 
     void ask_lane_change(const Car &car, const CheckCar &inLaneCar);
-    void compute_trajectory(std::vector<double>& next_x_vals, std::vector<double>& next_y_vals, Car& car,const CheckCar &check_info);
+    void compute_trajectory(std::vector<double>& next_x_vals, std::vector<double>& next_y_vals, Car& car);
     tk::spline compute_spline(Car &car);
+    void select_speed(const CheckCar& check_info);
 
     int previous_lane;
     double acc = .25;

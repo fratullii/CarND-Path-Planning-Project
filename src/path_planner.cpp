@@ -69,6 +69,10 @@ void Car::readTelemetry(json &json_data){
 
 PathPlanner::PathPlanner(Map& map_in){
     map = map_in;
+
+    // Initial values
+    ref.speed = 0;
+    ref.lane = 1;
 }
 
 CheckCar PathPlanner::check_cars_in_lane(Car &car)
@@ -244,9 +248,6 @@ tk::spline PathPlanner::compute_spline(Car &car)
         ptsx.push_back(car.x);
         ptsy.push_back(car.y);
 
-        // Initial values
-        ref.speed = 0;
-        ref.lane = 1;
     }
     else
     {
@@ -296,16 +297,8 @@ tk::spline PathPlanner::compute_spline(Car &car)
     return s;
 }
 
-void PathPlanner::compute_trajectory(std::vector<double>& next_x_vals, std::vector<double>& next_y_vals, Car& car,const CheckCar &check_info)
+void PathPlanner::select_speed(const CheckCar& check_info)
 {
-    // Update Car reference state
-    ref.x = car.x;
-    ref.y = car.y;
-    ref.yaw = deg2rad(car.yaw);
-
-    tk::spline s = compute_spline(car);
-
-    // Set speed
     double target_speed;
     target_speed = check_info.too_close ? check_info.speed : max_speed;
     if(ref.speed > target_speed)
@@ -318,14 +311,13 @@ void PathPlanner::compute_trajectory(std::vector<double>& next_x_vals, std::vect
         // Brake
         ref.speed += std::min(acc, (target_speed - ref.speed));
     }
+}
 
-    for(int i = 0; i < car.previous_path_size; ++i)
-    {
-        next_x_vals.push_back(car.previous_path_x[i]);
-        next_y_vals.push_back(car.previous_path_y[i]);
-    }
+void PathPlanner::compute_trajectory(std::vector<double>& next_x_vals, std::vector<double>& next_y_vals, Car& car)
+{
 
     // Calculate how to break up spline points
+    tk::spline s = compute_spline(car);
     double target_x = 20;
     double target_y = s(target_x);
     double target_dist = sqrt(pow(target_x,2) + pow(target_y, 2));
@@ -364,6 +356,20 @@ void PathPlanner::generate_trajectory(vector<double>& next_x_vals, vector<double
         ask_lane_change(car, check_info);
     }
 
-    // Obtain trajectory coordinate in x, y points
-    compute_trajectory(next_x_vals, next_y_vals, car, check_info);
+    // Update Car reference state
+    ref.x = car.x;
+    ref.y = car.y;
+    ref.yaw = deg2rad(car.yaw);
+    select_speed(check_info);
+
+    // Push back values from previous trajectory
+    for(int i = 0; i < car.previous_path_size; ++i)
+    {
+        next_x_vals.push_back(car.previous_path_x[i]);
+        next_y_vals.push_back(car.previous_path_y[i]);
+    }
+
+    // Add new x, y values for new trajectory
+    compute_trajectory(next_x_vals, next_y_vals, car);
+
 }
