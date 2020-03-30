@@ -133,7 +133,10 @@ double PathPlanner::cost_close_vehicle(const int c_lane, const double dist)
     return cost;
 }
 
-double PathPlanner::cost_side_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist)
+double PathPlanner::cost_incoming_vehicle( const int c_lane,
+                                           const double c_speed,
+                                           const double car_speed,
+                                           const double dist )
 {
     double range_dist = 50;
     double speed_diff = (c_speed - car_speed)/2.24;
@@ -151,7 +154,11 @@ double PathPlanner::cost_side_vehicle(const int c_lane, const double c_speed, co
     return cost;
 }
 
-double PathPlanner::cost_next_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist, const CheckCar& l_car)
+double PathPlanner::cost_next_vehicle( const int c_lane,
+                                       const double c_speed,
+                                       const double car_speed,
+                                       const double dist,
+                                       const CheckCar& l_car)
 {
     double range_dist = l_car.distance + 15;
     double cost;
@@ -198,14 +205,16 @@ void PathPlanner::ask_lane_change(const Car &car, const CheckCar &inLaneCar)
             // Count cars in lane
             no_car[idx] = false;
 
-            // Penalize lane change if there any cars close to the vehicle on near lane(s)
+            // Penalize lane change if there any cars close to the ego vehicle
             cost[idx] += cost_close_vehicle(check_lane, check_distance);
 
             // Penalize lane change if cars in the side mirrors are coming too fast
-            cost[idx] += cost_side_vehicle(check_lane, check_speed, car.speed, check_distance);
+            cost[idx] += cost_incoming_vehicle( check_lane, check_speed,
+                                                car.speed, check_distance );
 
-            // Penalize lane change if cars in the side mirrors are coming too fast
-            cost[idx] += cost_next_vehicle(check_lane, check_speed, car.speed, check_distance, inLaneCar);
+            // Penalize lane change if car ahed in other lanes are too s
+            cost[idx] += cost_next_vehicle( check_lane, check_speed, car.speed,
+                                            check_distance, inLaneCar );
         }
     }
 
@@ -219,13 +228,14 @@ void PathPlanner::ask_lane_change(const Car &car, const CheckCar &inLaneCar)
     }
 
     // Stop from returning to previous lane before 3 s from last lane change
-    int previous_lane_idx = std::find(insp_lanes.begin(), insp_lanes.end(), previous_lane) - insp_lanes.begin();
+    int previous_lane_idx = std::find(insp_lanes.begin(), insp_lanes.end(),
+                                      previous_lane) - insp_lanes.begin();
     if(!lane_change_timer.is_ready()) { cost[previous_lane_idx] += 1000; }
 
     // Select lanes with smallest cost
-    int best_cost_idx = std::min_element(cost.begin(), cost.end()) - cost.begin();
+    int best_cost_idx = std::min_element(cost.begin(), cost.end())
+                        - cost.begin();
     int best_lane = insp_lanes[best_cost_idx];
-
     previous_lane = ref.lane;
     ref.lane = best_lane;
     if(best_lane != previous_lane) {lane_change_timer.set_timer(3.0); }
@@ -313,7 +323,9 @@ void PathPlanner::select_speed(const CheckCar& check_info)
     }
 }
 
-void PathPlanner::compute_trajectory(std::vector<double>& next_x_vals, std::vector<double>& next_y_vals, Car& car)
+void PathPlanner::compute_trajectory( std::vector<double>& next_x_vals,
+                                      std::vector<double>& next_y_vals,
+                                      Car& car )
 {
 
     // Calculate how to break up spline points
@@ -343,7 +355,9 @@ void PathPlanner::compute_trajectory(std::vector<double>& next_x_vals, std::vect
     }
 }
 
-void PathPlanner::generate_trajectory(vector<double>& next_x_vals, vector<double>& next_y_vals, Car &car)
+void PathPlanner::generate_trajectory(vector<double>& next_x_vals,
+                                      vector<double>& next_y_vals,
+                                      Car &car)
 {
 
     // Check if there are slower cars in ego vehicle's lane
