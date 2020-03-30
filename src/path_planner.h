@@ -65,6 +65,27 @@ struct Car {
     void readTelemetry(nlohmann::json &json_data);
 };
 
+struct checkCar {
+    bool flag;
+    bool too_close;
+    double speed;
+    double distance;
+};
+
+class Timer {
+    private:
+
+    double time = 0;
+
+    public:
+
+    inline void set_timer(double t) {time = t; };
+    inline double get_time() {return time; };
+
+    inline void update_timer(double time_step) {time = std::max(0., time-time_step); };
+    inline bool is_ready() {return (time == 0);};
+};
+
 class PathPlanner{
     public:
 
@@ -75,8 +96,35 @@ class PathPlanner{
     std::vector<std::vector<double>> generate_trajectory(Car &car);
 
     private:
+    /**
+     * @brief Reference state
+     *
+     * State of the last point in the trajectory
+     */
+    struct Reference {
+        double x;
+        double y;
+        double yaw;
+        double speed;
+        double acc;
+        double s;
+        double d;
+        int lane;
+    } ref;
 
     Map map;
+
+    checkCar check_cars_in_lane(Car &car);
+
+    void ask_lane_change(const Car &car, const checkCar &inLaneCar);
+
+    int previous_lane;
+
+    Timer lane_change_timer;
+
+    double cost_close_vehicle(const int c_lane, const double dist);
+    double cost_side_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist);
+    double cost_next_vehicle(const int c_lane, const double c_speed, const double car_speed, const double dist, const checkCar& l_car);
 
     /**
      * Calculate the Jerk Minimizing Trajectory that connects the initial state
